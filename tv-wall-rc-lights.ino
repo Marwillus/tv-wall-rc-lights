@@ -2,9 +2,10 @@
 #include "EasingLib.h"
 
 RCSwitch mySwitch = RCSwitch();
-Easing easing(ease_mode::EASE_IN_OUT_CUBIC, 1000);
+Easing slowEase(ease_mode::EASE_IN_OUT_CUBIC, 2000);
+Easing fastEase(ease_mode::EASE_IN_OUT_CUBIC, 100);
 
-int ledPin = 5;
+int LED_PIN = 11;
 int potiValue = 0;
 bool mode = false;
 bool modeChanged = mode;
@@ -13,29 +14,35 @@ int smoothBrightness = 0;
 int prevBrightness = 0;
 float maxBrightness = 100;
 
-unsigned long currentTime;          // Store current millis().
-unsigned long previousTime;         // store last measured millis().
-unsigned long pixelPrevious = 0;    // Previous Pixel Millis
-unsigned long patternPrevious = 0;  // Previous Pattern Millis
+unsigned long now;   // Store current millis().
+unsigned long prev;  // store last measured millis().
+unsigned long deltaT = 0;
 
 void setup() {
   Serial.begin(9600);
-  mySwitch.enableReceive(0);  // Receiver on interrupt 0 => that is pin #2
-  pinMode(ledPin, OUTPUT);
+  mySwitch.enableReceive(1);  // Receiver on interrupt 0 => that is pin #2
+  pinMode(LED_PIN, OUTPUT);
 }
 
 void loop() {
   pingRcSwitch();
+  pingPoti();
 
-  // maxBrightness = map(analogRead(2), 0, 800, 0, 100);
-  // maxBrightness = map(analogRead(2), 5, 975, 0, 100);
+  if (mode == 1) {
+    // fading up --> led1 for 2s, pause for 1s, led2 for 1s 
+  }
+  if (mode == 2) {
+    //fading down --> all at same time
+  }
+  fadeTo();
+}
 
-  // analogWrite(ledPin, maxBrightness);
-  if (smoothBrightness != prevBrightness) {
-    smoothBrightness = easing.SetSetpoint(brightness);
-    analogWrite(ledPin, smoothBrightness);
+void fadeTo() {
+  if (brightness != prevBrightness) {
+    smoothBrightness = fastEase.SetSetpoint(brightness);
+    analogWrite(LED_PIN, smoothBrightness);
     Serial.println(smoothBrightness);
-    smoothBrightness = brightness;
+    prevBrightness = smoothBrightness;
   }
 }
 
@@ -46,12 +53,18 @@ void pingRcSwitch() {
 
     if (mySwitch.getReceivedValue() == 8685765 || mySwitch.getReceivedValue() == 8685767) {
       brightness = maxBrightness;
+      // mode = true;
       Serial.println("on");
     }
     if (mySwitch.getReceivedValue() == 8685773 || mySwitch.getReceivedValue() == 8685775) {
       brightness = 0;
+      // mode = false;
       Serial.println("off");
     }
     mySwitch.resetAvailable();
   }
+}
+
+void pingPoti() {
+  // maxBrightness = map(analogRead(2), 5, 975, 0, 100);
 }
