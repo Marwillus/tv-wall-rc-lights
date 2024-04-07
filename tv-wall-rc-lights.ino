@@ -3,8 +3,10 @@
 
 RCSwitch mySwitch = RCSwitch();
 
-int FAST_DELAY = 800;
-int SLOW_DELAY = 2000;
+const int FAST_DELAY = 2000;
+const int SLOW_DELAY = 4000;
+const int OFFSET = 800;
+
 Easing fastEase(ease_mode::EASE_IN_OUT_CUBIC, FAST_DELAY);
 Easing slowEase(ease_mode::EASE_IN_OUT_CUBIC, SLOW_DELAY);
 
@@ -12,6 +14,7 @@ int LED_1 = 10;
 int LED_2 = 11;
 int potiValue = 0;
 int mode = 0;
+bool nextMode = false;
 
 int brightness = 0;
 int brightness1 = 0;
@@ -32,6 +35,7 @@ void setup() {
 }
 
 void loop() {
+  now = millis();
   pingRcSwitch();
   pingPoti();
 
@@ -59,39 +63,43 @@ void startTimer(int nextMode) {
 }
 
 void fadeUp() {
-  now = millis();
-
   if (brightness1 <= maxBrightness) {
-    Serial.println(smoothBrightness);
-    smoothBrightness = slowEase.SetSetpoint(maxBrightness);
-    analogWrite(LED_1, smoothBrightness);
-    brightness1 = smoothBrightness;
+    // Serial.println(smoothBrightness);
+    brightness1 = slowEase.SetSetpoint(maxBrightness);
+    analogWrite(LED_1, brightness1);
   }
-  if (now - prev >= SLOW_DELAY) {
+  if (now - prev >= OFFSET) {
     if (brightness2 < maxBrightness) {
-      smoothBrightness = fastEase.SetSetpoint(maxBrightness);
-      analogWrite(LED_2, smoothBrightness);
-      brightness2 = smoothBrightness;
+      brightness2 = fastEase.SetSetpoint(maxBrightness);
+      analogWrite(LED_2, brightness2);
     }
   }
-  if (brightness2 == maxBrightness) {
+  if (now - prev >= 4000) {
+    blink();
+    nextMode = true;
+  }
+  if (nextMode && brightness2 == maxBrightness) {
+    nextMode = false;
     mode = 0;
   }
 }
 
 void fadeDown() {
-  now = millis();
-
-  smoothBrightness = slowEase.SetSetpoint(0);
+  brightness1 = fastEase.SetSetpoint(0);
+  brightness2 = slowEase.SetSetpoint(0);
   fastEase.SetSetpoint(0);
-  analogWrite(LED_1, smoothBrightness);
-  analogWrite(LED_2, smoothBrightness);
-  brightness1 = smoothBrightness;
-  brightness2 = smoothBrightness;
+  analogWrite(LED_1, brightness1);
+  analogWrite(LED_2, brightness2);
 
   if (smoothBrightness <= 0) {
     mode = 0;
   }
+}
+
+void blink() {
+  analogWrite(LED_2, maxBrightness / 2);
+  delay(200);
+  analogWrite(LED_2, maxBrightness);
 }
 
 void pingRcSwitch() {
