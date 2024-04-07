@@ -2,14 +2,20 @@
 #include "EasingLib.h"
 
 RCSwitch mySwitch = RCSwitch();
-Easing slowEase(ease_mode::EASE_IN_OUT_CUBIC, 2000);
-Easing fastEase(ease_mode::EASE_IN_OUT_CUBIC, 100);
 
-int LED_PIN = 11;
+int FAST_DELAY = 800;
+int SLOW_DELAY = 2000;
+Easing fastEase(ease_mode::EASE_IN_OUT_CUBIC, FAST_DELAY);
+Easing slowEase(ease_mode::EASE_IN_OUT_CUBIC, SLOW_DELAY);
+
+int LED_1 = 10;
+int LED_2 = 11;
 int potiValue = 0;
-bool mode = false;
-bool modeChanged = mode;
+int mode = 0;
+
 int brightness = 0;
+int brightness1 = 0;
+int brightness2 = 0;
 int smoothBrightness = 0;
 int prevBrightness = 0;
 float maxBrightness = 100;
@@ -21,28 +27,70 @@ unsigned long deltaT = 0;
 void setup() {
   Serial.begin(9600);
   mySwitch.enableReceive(1);  // Receiver on interrupt 0 => that is pin #2
-  pinMode(LED_PIN, OUTPUT);
+  pinMode(LED_1, OUTPUT);
+  pinMode(LED_2, OUTPUT);
 }
 
 void loop() {
   pingRcSwitch();
   pingPoti();
 
-  if (mode == 1) {
-    // fading up --> led1 for 2s, pause for 1s, led2 for 1s 
+  switch (mode) {
+    case 1:
+      startTimer(2);
+      break;
+    case 2:
+      // fading up --> led1 for 2s, pause for 1s, led2 for 1s
+      fadeUp();
+      break;
+    case 3:
+      //fading down --> all at same time
+      fadeDown();
+      break;
+
+    default:
+      break;
   }
-  if (mode == 2) {
-    //fading down --> all at same time
-  }
-  fadeTo();
 }
 
-void fadeTo() {
-  if (brightness != prevBrightness) {
-    smoothBrightness = fastEase.SetSetpoint(brightness);
-    analogWrite(LED_PIN, smoothBrightness);
+void startTimer(int nextMode) {
+  mode = nextMode;
+  prev = now;
+}
+
+void fadeUp() {
+  now = millis();
+
+  if (brightness1 <= maxBrightness) {
     Serial.println(smoothBrightness);
-    prevBrightness = smoothBrightness;
+    smoothBrightness = slowEase.SetSetpoint(maxBrightness);
+    analogWrite(LED_1, smoothBrightness);
+    brightness1 = smoothBrightness;
+  }
+  if (now - prev >= SLOW_DELAY) {
+    if (brightness2 < maxBrightness) {
+      smoothBrightness = fastEase.SetSetpoint(maxBrightness);
+      analogWrite(LED_2, smoothBrightness);
+      brightness2 = smoothBrightness;
+    }
+  }
+  if (brightness2 == maxBrightness) {
+    mode = 0;
+  }
+}
+
+void fadeDown() {
+  now = millis();
+
+  smoothBrightness = slowEase.SetSetpoint(0);
+  fastEase.SetSetpoint(0);
+  analogWrite(LED_1, smoothBrightness);
+  analogWrite(LED_2, smoothBrightness);
+  brightness1 = smoothBrightness;
+  brightness2 = smoothBrightness;
+
+  if (smoothBrightness <= 0) {
+    mode = 0;
   }
 }
 
@@ -52,13 +100,13 @@ void pingRcSwitch() {
     Serial.println(mySwitch.getReceivedValue());
 
     if (mySwitch.getReceivedValue() == 8685765 || mySwitch.getReceivedValue() == 8685767) {
-      brightness = maxBrightness;
-      // mode = true;
+      // brightness = maxBrightness;
+      mode = 1;
       Serial.println("on");
     }
     if (mySwitch.getReceivedValue() == 8685773 || mySwitch.getReceivedValue() == 8685775) {
-      brightness = 0;
-      // mode = false;
+      // brightness = 0;
+      mode = 3;
       Serial.println("off");
     }
     mySwitch.resetAvailable();
