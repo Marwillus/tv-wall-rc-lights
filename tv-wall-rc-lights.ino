@@ -5,8 +5,8 @@ RCSwitch mySwitch = RCSwitch();
 const int FAST_DELAY = 2000;
 const int SLOW_DELAY = 3000;
 
-int LED_1 = 10;
-int LED_2 = 11;
+int LED_1 = 9;
+int LED_2 = 10;
 int POTI_PIN = 2;
 
 bool powerOn = false;
@@ -28,9 +28,13 @@ unsigned long prevOffset;  // store last measured millis().
 unsigned long deltaT = 0;
 int prevFade = 50;
 int fadeInterval = 20;
+// float t1 = 0.0;
+// float t2 = 0.0;
+
+int fadeStep = 0;
 
 void setup() {
-  Serial.begin(9600);
+  // Serial.begin(9600);
   mySwitch.enableReceive(1);  // Receiver on interrupt 0 => that is pin #2
   pinMode(LED_1, OUTPUT);
   pinMode(LED_2, OUTPUT);
@@ -61,93 +65,85 @@ void startOffsetTimer() {
 }
 
 void fadeUp() {
-  if (brightness1 <= maxBrightness) {
+  if (fadeStep == 0) {
     if (now - prevFade >= fadeInterval) {
       prevFade = now;
+      static float t1 = 0.0;
+      const float duration = 1500.0;
 
-      static float t = 0.0;           // Zeitvariable für die Animation
-      const float duration = 4000.0;  // Dauer der Animation (in Millisekunden)
+      // Serial.print("Fadeup 1: ");
+      // Serial.print(t1);
+      // Serial.print(", ");
+      // Serial.print("brightness1: ");
+      // Serial.println(brightness1);
 
-      if (t <= 1.0) {
-        brightness1 = (int)(maxBrightness * easeOutBack(t));
+      if (t1 <= 1.0) {
+        brightness1 = (int)(maxBrightness * easeOutBack(t1));
         analogWrite(LED_1, brightness1);
-        t += fadeInterval / duration;
-        Serial.print("Fadeup 1: ");
-        Serial.println(brightness1);
+        t1 += fadeInterval / duration;
       } else {
-        t = 0.0;
+        t1 = 0.0;
+        fadeStep++;
       }
     }
   }
-  if (now - prevOffset >= 2000) {
-    if (brightness2 < maxBrightness) {
-      
-      static float t = 0.0;           // Zeitvariable für die Animation
-      const float duration = 4000.0;  // Dauer der Animation (in Millisekunden)
+  // offset delay
+  if (now - prevOffset >= 1000) {
+    if (fadeStep == 1) {
+      if (now - prevFade >= fadeInterval) {
+        prevFade = now;
+        static float t2 = 0.0;
+        const float duration = 4000.0;
 
-      if (t <= 1.0) {
-        brightness2 = (int)(maxBrightness * easeOutBack(t));
-        analogWrite(LED_2, brightness2);
-        t += fadeInterval / duration;
-        Serial.print("Fadeup 2: ");
-        Serial.println(brightness2);
-      } else {
-        t = 0.0;
+        // Serial.print("Fadeup 2: ");
+        // Serial.print(t2);
+        // Serial.print(", ");
+        // Serial.print("brightness2: ");
+        // Serial.println(brightness2);
+
+        if (t2 <= 1.0) {
+          brightness2 = (int)(maxBrightness * easeOutQuad(t2));
+          analogWrite(LED_2, brightness2);
+          t2 += fadeInterval / duration;
+        } else {
+          t2 = 0.0;
+          fadeStep++;
+        }
       }
     }
   }
-  if (now - prevOffset >= 6000) {
+  if (now - prevOffset >= 7000 && fadeStep == 2) {
     blink();
-    nextMode = true;
+    fadeStep++;
   }
-  if (nextMode && brightness2 == maxBrightness) {
-    nextMode = false;
+  if (fadeStep == 3) {
     mode = 0;
+    fadeStep = 0;
   }
-}
-
-int brightnessEaseOutUp(int brightness, int ledPin, float t = 0.0, float duration = 4000.0) {
-      if (t <= 1.0) {
-        brightness = (int)(brightness * easeOutBack(t));
-        analogWrite(LED_2, brightness);
-        t += fadeInterval / duration;
-        Serial.print("Fadeup 2: ");
-        Serial.println(brightness);
-      } else {
-        t = 0.0;
-      }
 }
 
 void fadeDown() {
-  static float t = 1.0;           // Zeitvariable für die Animation
-  const float duration = 4000.0;  // Dauer der Animation (in Millisekunden)
+  if (now - prevFade >= fadeInterval) {
+    prevFade = now;
+    static float t3 = 1.0;
+    const float duration = 4000.0;
 
-  if (t >= 0.0) {
-    brightness1 = (int)(maxBrightness * easeInOutQuad(t));
-    brightness2 = (int)(maxBrightness * easeOutQuad(t));
-    analogWrite(LED_1, brightness1);
-    analogWrite(LED_2, brightness2);
-    t -= fadeInterval / duration;
-    Serial.print("Fade down: ");
-    Serial.println(brightness1);
-  } 
-  
-  if (t < 0.0) {
-    t = 0.0;
-    mode = 0;
+    if (t3 >= 0.0) {
+      brightness1 = (int)(maxBrightness * easeInOutQuad(t3));
+      brightness2 = (int)(maxBrightness * easeOutQuad(t3));
+      analogWrite(LED_1, brightness1);
+      analogWrite(LED_2, brightness2);
+      t3 -= fadeInterval / duration;
+      // Serial.print("Fade down: ");
+      // Serial.println(t3);
+    }
+
+    if (t3 < 0.0) {
+      t3 = 1.0;
+      mode = 0;
+      fadeStep = 0;
+    }
   }
-
-  // brightness1 = Led1.SetSetpoint(0);
-  // analogWrite(LED_1, brightness1);
-  // if (now - prevOffset >= 1000) {
-  //   if (brightness2 > 0) {
-  //     brightness2 = Led2.SetSetpoint(0);
-  //     analogWrite(LED_2, brightness2);
-  //   }
-  // }
-  // if (brightness2 == 0) {
-  //   mode = 0;
-  // }
 }
 
 
@@ -159,8 +155,6 @@ void blink() {
 
 void pingRcSwitch() {
   if (mySwitch.available()) {
-    // Serial.print("Received Value: ");
-    // Serial.println(mySwitch.getReceivedValue());
 
     if (mySwitch.getReceivedValue() == 8685765 || mySwitch.getReceivedValue() == 8685767) {
       startOffsetTimer();
@@ -169,10 +163,12 @@ void pingRcSwitch() {
       // Serial.println("on");
     }
     if (mySwitch.getReceivedValue() == 8685773 || mySwitch.getReceivedValue() == 8685775) {
-      startOffsetTimer();
-      powerOn = false;
-      mode = 2;
-      // Serial.println("off");
+      if (powerOn) {
+        startOffsetTimer();
+        powerOn = false;
+        mode = 2;
+        // Serial.println("off");
+      }
     }
     mySwitch.resetAvailable();
   }
